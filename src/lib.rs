@@ -211,7 +211,7 @@ impl Build {
             "x86_64-unknown-netbsd" => "BSD-x86_64",
             "wasm32-unknown-emscripten" => "gcc",
             "wasm32-unknown-unknown" => "gcc",
-            "aarch64-apple-ios" => "ios64-cross",
+            "aarch64-apple-ios" => "ios64-xcrun",
             "x86_64-apple-ios" => "iossimulator-xcrun",
             _ => panic!("don't know how to configure OpenSSL for {}", target),
         };

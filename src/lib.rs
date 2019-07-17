@@ -61,6 +61,8 @@ impl Build {
     }
 
     pub fn build(&mut self) -> Artifacts {
+        println!("build()");
+        
         let target = &self.target.as_ref().expect("TARGET dir not set")[..];
         let host = &self.host.as_ref().expect("HOST dir not set")[..];
         let out_dir = self.out_dir.as_ref().expect("OUT_DIR not set");
@@ -135,7 +137,37 @@ impl Build {
             // Never shared on non-MSVC
             configure.arg("no-shared");
         }
-
+        
+        if target.contains("ios") {
+            println!("setting ios args");
+            
+            let toolchain_path = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin";
+            
+            configure
+                .arg("no-shared")
+                .arg("no-hw")
+                .arg("no-engine")
+                .env(
+                    "PATH",
+                    &env::var_os("PATH").map_or(
+                        toolchain_path.to_owned(),
+                        |v| format!("{}:{}", toolchain_path, v.to_str().expect("PATH is not valid unicode"))
+                    )
+                );
+        }
+        
+        if target == "aarch64-apple-ios" {
+            configure
+                .env("CROSS_TOP", "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer")
+                .env("CROSS_SDK", "iPhoneOS.sdk");
+        }
+        
+        if target == "x86_64-apple-ios" {
+            configure
+                .env("CROSS_TOP", "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer")
+                .env("CROSS_SDK", "iPhoneSimulator.sdk");
+        }
+        
         let os = match target {
             // Note that this, and all other android targets, aren't using the
             // `android64-aarch64` (or equivalent) builtin target. That
@@ -179,15 +211,19 @@ impl Build {
             "x86_64-unknown-netbsd" => "BSD-x86_64",
             "wasm32-unknown-emscripten" => "gcc",
             "wasm32-unknown-unknown" => "gcc",
+            "aarch64-apple-ios" => "ios64-cross",
+            "x86_64-apple-ios" => "iossimulator-xcrun",
             _ => panic!("don't know how to configure OpenSSL for {}", target),
         };
 
         configure.arg(os);
-
+        
+        println!("configure before cross-compiler section: {:?}", configure);
+        
         // If we're not on MSVC we configure cross compilers and cross tools and
         // whatnot. Note that this doesn't happen on MSVC b/c things are pretty
         // different there and this isn't needed most of the time anyway.
-        if !target.contains("msvc") {
+        if !target.contains("msvc") && !target.contains("ios") {
             let mut cc = cc::Build::new();
             cc.target(target)
                 .host(host)
@@ -259,6 +295,8 @@ impl Build {
                 configure.arg("-DOPENSSL_NO_SECURE_MEMORY");
             }
         }
+        
+        println!("configure after cross-compiler section: {:?}", configure);
 
         // And finally, run the perl configure script!
         configure.current_dir(&inner_dir);
